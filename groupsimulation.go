@@ -4,13 +4,14 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/veandco/go-sdl2/sdl"
 )
 
 type GroupSimulation struct {
 	sb, xb, yb, cellSize int
-	cells                [][][]bool
+	cells, buffer        [][][]bool
 }
 
 func NewGroupSimulation(cellSize, xSize, ySize int) (*GroupSimulation, error) {
@@ -19,9 +20,13 @@ func NewGroupSimulation(cellSize, xSize, ySize int) (*GroupSimulation, error) {
 	yb := ySize / cellSize
 
 	a := make([][][]bool, sb)
-
 	for i := range a {
 		a[i] = fillBoolCells(makeBoolCells(xb, yb))
+	}
+
+	buffer := make([][][]bool, sb)
+	for i := range buffer {
+		buffer[i] = makeBoolCells(xb, yb)
 	}
 
 	gs := &GroupSimulation{
@@ -30,6 +35,7 @@ func NewGroupSimulation(cellSize, xSize, ySize int) (*GroupSimulation, error) {
 		yb:       yb,
 		cellSize: cellSize,
 		cells:    a,
+		buffer:   buffer,
 	}
 
 	return gs, nil
@@ -62,30 +68,38 @@ func (gs *GroupSimulation) Step() error {
 		}
 	}
 
+	var wg sync.WaitGroup
+
 	for s := 0; s < len(gs.cells); s++ {
-		// TODO: Remove array copy.
-		t := makeBoolCells(gs.xb, gs.yb)
+		wg.Add(1)
 
-		for x := 0; x < gs.xb; x++ {
-			for y := 0; y < gs.yb; y++ {
-				n := gs.neighbours(s, x, y)
+		go func(s int) {
+			defer wg.Done()
 
-				if gs.cells[s][x][y] {
-					if n < 2 || n > 3 {
-						t[x][y] = false
+			for x := 0; x < gs.xb; x++ {
+				for y := 0; y < gs.yb; y++ {
+					n := gs.neighbours(s, x, y)
+
+					gs.buffer[s][x][y] = false
+					if gs.cells[s][x][y] {
+						if !(n < 2 || n > 3) {
+							gs.buffer[s][x][y] = true
+						}
 					} else {
-						t[x][y] = true
-					}
-				} else {
-					if n == 3 {
-						t[x][y] = true
+						if n == 3 {
+							gs.buffer[s][x][y] = true
+						}
 					}
 				}
 			}
-		}
-
-		gs.cells[s] = t
+		}(s)
 	}
+
+	wg.Wait()
+
+	t := gs.cells
+	gs.cells = gs.buffer
+	gs.buffer = t
 
 	return nil
 }

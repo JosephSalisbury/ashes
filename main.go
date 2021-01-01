@@ -14,8 +14,8 @@ const (
 	WindowSizeX = 1200
 	WindowSizeY = 800
 
-	CellSize       = 10
-	StepsPerSecond = 10
+	CellSize       = 20
+	StepsPerSecond = 20
 	Debug          = true
 )
 
@@ -43,22 +43,22 @@ func main() {
 	defer window.Destroy()
 
 	var simulation Simulation
-	// {
-	// 	gs, err := NewGroupSimulation(CellSize, WindowSizeX, WindowSizeY)
-	// 	if err != nil {
-	// 		log.Fatalf("could not create group simulation: %v", err)
-	// 	}
-	//
-	// 	simulation = gs
-	// }
 	{
-		ogs, err := NewOptimisedGroupSimulation(CellSize, WindowSizeX, WindowSizeY)
+		gs, err := NewGroupSimulation(CellSize, WindowSizeX, WindowSizeY)
 		if err != nil {
-			log.Fatalf("could not create optimised group simulation: %v", err)
+			log.Fatalf("could not create group simulation: %v", err)
 		}
 
-		simulation = ogs
+		simulation = gs
 	}
+	// {
+	// 	ogs, err := NewOptimisedGroupSimulation(CellSize, WindowSizeX, WindowSizeY)
+	// 	if err != nil {
+	// 		log.Fatalf("could not create optimised group simulation: %v", err)
+	// 	}
+	//
+	// 	simulation = ogs
+	// }
 
 	maxDuration := time.Second / StepsPerSecond
 	lastStepTime := time.Now()
