@@ -4,6 +4,7 @@ import (
 	"log"
 	"math/rand"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,7 +17,7 @@ const (
 	WindowSizeX = 1200
 	WindowSizeY = 800
 
-	CellSize = 7
+	CellSize = 10
 )
 
 func init() {
@@ -28,22 +29,22 @@ func randUint8() uint8 {
 }
 
 func randBool() bool {
-	return rand.Float32() < 0.25
+	return rand.Float32() < 0.3
 }
 
 func getColor(bs []bool) uint32 {
-	s := ""
+	var sb strings.Builder
 
 	for _, b := range bs {
-		x := "1"
 		if b {
-			x = "0"
+			sb.WriteString("0")
+		} else {
+			sb.WriteString("1")
 		}
 
-		s = s + x
 	}
 
-	i, _ := strconv.ParseInt(s, 2, 32)
+	i, _ := strconv.ParseInt(sb.String(), 2, 32)
 	ix := uint32(i)
 
 	return ix
@@ -116,7 +117,7 @@ func main() {
 		}
 
 		for i := 0; i < len(simulations); i++ {
-			if rand.Float32() < 0.0001 {
+			if rand.Float32() < 0.0005 {
 				s, err := NewSimulation(CellSize, WindowSizeX, WindowSizeY)
 				if err != nil {
 					log.Fatalf("could not recreate simulation %v: %v", i, err)
