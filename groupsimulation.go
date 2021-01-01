@@ -21,7 +21,7 @@ func NewGroupSimulation(cellSize, xSize, ySize int) (*GroupSimulation, error) {
 	a := make([][][]bool, sb)
 
 	for i := range a {
-		a[i] = fillCells(makeCells(xb, yb))
+		a[i] = fillBoolCells(makeBoolCells(xb, yb))
 	}
 
 	gs := &GroupSimulation{
@@ -35,7 +35,7 @@ func NewGroupSimulation(cellSize, xSize, ySize int) (*GroupSimulation, error) {
 	return gs, nil
 }
 
-func makeCells(xb, yb int) [][]bool {
+func makeBoolCells(xb, yb int) [][]bool {
 	a := make([][]bool, xb)
 
 	for i := range a {
@@ -45,7 +45,7 @@ func makeCells(xb, yb int) [][]bool {
 	return a
 }
 
-func fillCells(a [][]bool) [][]bool {
+func fillBoolCells(a [][]bool) [][]bool {
 	for x := 0; x < len(a); x++ {
 		for y := 0; y < len(a[0]); y++ {
 			a[x][y] = rand.Float32() < 0.3
@@ -58,13 +58,13 @@ func fillCells(a [][]bool) [][]bool {
 func (gs *GroupSimulation) Step() error {
 	for s := 0; s < len(gs.cells); s++ {
 		if rand.Float32() < 0.0005 {
-			gs.cells[s] = makeCells(gs.xb, gs.yb)
+			gs.cells[s] = makeBoolCells(gs.xb, gs.yb)
 		}
 	}
 
 	for s := 0; s < len(gs.cells); s++ {
 		// TODO: Remove array copy.
-		t := makeCells(gs.xb, gs.yb)
+		t := makeBoolCells(gs.xb, gs.yb)
 
 		for x := 0; x < gs.xb; x++ {
 			for y := 0; y < gs.yb; y++ {
