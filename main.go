@@ -14,10 +14,9 @@ const (
 	WindowSizeX = 1200
 	WindowSizeY = 800
 
-	CellSize = 5
-
-	FramesPerSecond = 60
-	StepsPerSecond  = 30
+	CellSize       = 1
+	StepsPerSecond = 10
+	Debug          = true
 )
 
 func init() {
@@ -53,6 +52,9 @@ func main() {
 		simulation = s
 	}
 
+	maxDuration := time.Second / StepsPerSecond
+	lastStepTime := time.Now()
+
 	running := true
 	for running {
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
@@ -68,18 +70,46 @@ func main() {
 			log.Fatalf("could not get surface: %v", err)
 		}
 
-		surface.FillRect(nil, 0)
+		now := time.Now()
+		var stepStart time.Time
+		var renderStart time.Time
+		var renderEnd time.Time
 
-		if err := simulation.Step(); err != nil {
-			log.Fatalf("could not step simulation: %v", err)
+		if now.Sub(lastStepTime) > maxDuration {
+			surface.FillRect(nil, 0)
+
+			stepStart = time.Now()
+
+			if err := simulation.Step(); err != nil {
+				log.Fatalf("could not step simulation: %v", err)
+			}
+
+			renderStart = time.Now()
+
+			if err := simulation.Render(surface); err != nil {
+				log.Fatalf("could not render simulation: %v", err)
+			}
+
+			renderEnd = time.Now()
+
+			lastStepTime = now
+
+			window.UpdateSurface()
 		}
 
-		if err := simulation.Render(surface); err != nil {
-			log.Fatalf("could not render simulation: %v", err)
+		duration := time.Now().Sub(now)
+
+		var waitTime uint32
+		if duration < maxDuration {
+			waitTime = uint32((maxDuration - duration).Milliseconds())
 		}
 
-		window.UpdateSurface()
+		if Debug {
+			log.Printf("frame: %v (step: %v, render: %v) (max: %v), wait: %v ms", duration, renderStart.Sub(stepStart), renderEnd.Sub(renderStart), maxDuration, waitTime)
+		}
 
-		sdl.Delay(30)
+		if waitTime > 0 {
+			sdl.Delay(waitTime)
+		}
 	}
 }
