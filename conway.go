@@ -1,114 +1,170 @@
 package main
 
-var (
-	black uint32 = 0x00000000
-	white uint32 = 0xffffffff
+import (
+	"math/rand"
+	"strconv"
+	"strings"
+
+	"github.com/veandco/go-sdl2/sdl"
 )
 
-type Simulation struct {
-	size  int
-	array [][]bool
+type Simulation interface {
+	Step() error
+	Render(*sdl.Surface) error
 }
 
-func NewSimulation(size, x, y int) (*Simulation, error) {
-	xp := x / size
-	yp := y / size
+type GroupSimulation struct {
+	sb, xb, yb, cellSize int
+	cells                [][][]bool
+}
 
-	a := make([][]bool, xp)
+func NewGroupSimulation(cellSize, xSize, ySize int) (*GroupSimulation, error) {
+	sb := 32
+	xb := xSize / cellSize
+	yb := ySize / cellSize
+
+	a := make([][][]bool, sb)
 
 	for i := range a {
-		a[i] = make([]bool, yp)
+		a[i] = fillCells(makeCells(xb, yb))
 	}
 
-	s := &Simulation{
-		size:  size,
-		array: a,
+	gs := &GroupSimulation{
+		sb:       sb,
+		xb:       xb,
+		yb:       yb,
+		cellSize: cellSize,
+		cells:    a,
 	}
 
-	for i := 0; i < xp; i++ {
-		for j := 0; j < yp; j++ {
-			s.array[i][j] = randBool()
+	return gs, nil
+}
+
+func makeCells(xb, yb int) [][]bool {
+	a := make([][]bool, xb)
+
+	for i := range a {
+		a[i] = make([]bool, yb)
+	}
+
+	return a
+}
+
+func fillCells(a [][]bool) [][]bool {
+	for x := 0; x < len(a); x++ {
+		for y := 0; y < len(a[0]); y++ {
+			a[x][y] = rand.Float32() < 0.3
 		}
 	}
 
-	return s, nil
+	return a
 }
 
-func (s *Simulation) Step() error {
-	t := make([][]bool, len(s.array))
-	for x := range t {
-		t[x] = make([]bool, len(s.array[0]))
+func (gs *GroupSimulation) Step() error {
+	for s := 0; s < len(gs.cells); s++ {
+		if rand.Float32() < 0.0005 {
+			gs.cells[s] = makeCells(gs.xb, gs.yb)
+		}
 	}
 
-	for i := 0; i < len(s.array); i++ {
-		for j := 0; j < len(s.array[0]); j++ {
-			n := getNumLiveNeighbours(s.array, i, j)
+	for s := 0; s < len(gs.cells); s++ {
+		// TODO: Remove array copy.
+		t := makeCells(gs.xb, gs.yb)
 
-			if s.array[i][j] {
-				if n < 2 || n > 3 {
-					t[i][j] = false
+		for x := 0; x < gs.xb; x++ {
+			for y := 0; y < gs.yb; y++ {
+				n := gs.neighbours(s, x, y)
+
+				if gs.cells[s][x][y] {
+					if n < 2 || n > 3 {
+						t[x][y] = false
+					} else {
+						t[x][y] = true
+					}
 				} else {
-					t[i][j] = true
-				}
-			} else {
-				if n == 3 {
-					t[i][j] = true
+					if n == 3 {
+						t[x][y] = true
+					}
 				}
 			}
 		}
-	}
 
-	s.array = t
+		gs.cells[s] = t
+	}
 
 	return nil
 }
 
-func (s *Simulation) GetCell(x, y int) bool {
-	return s.array[x][y]
-}
-
-func getNumLiveNeighbours(a [][]bool, x, y int) int {
+func (gs *GroupSimulation) neighbours(s, x, y int) int {
 	t := 0
 
-	// top left
-	if (x != 0 && y != 0) && a[x-1][y-1] {
+	if (x != 0 && y != 0) && gs.cells[s][x-1][y-1] {
+		t++
+	}
+	if y != 0 && gs.cells[s][x][y-1] {
+		t++
+	}
+	if (x+1 != gs.xb && y != 0) && gs.cells[s][x+1][y-1] {
 		t++
 	}
 
-	// top
-	if y != 0 && a[x][y-1] {
+	if x != 0 && gs.cells[s][x-1][y] {
+		t++
+	}
+	if x+1 != gs.xb && gs.cells[s][x+1][y] {
 		t++
 	}
 
-	// top right
-	if (x+1 != len(a) && y != 0) && a[x+1][y-1] {
+	if (x != 0 && y+1 != gs.yb) && gs.cells[s][x-1][y+1] {
 		t++
 	}
-
-	// left
-	if x != 0 && a[x-1][y] {
+	if y+1 != gs.yb && gs.cells[s][x][y+1] {
 		t++
 	}
-
-	// right
-	if x+1 != len(a) && a[x+1][y] {
-		t++
-	}
-
-	// bottom left
-	if (x != 0 && y+1 != len(a[0])) && a[x-1][y+1] {
-		t++
-	}
-
-	// bottom
-	if y+1 != len(a[0]) && a[x][y+1] {
-		t++
-	}
-
-	// bottom right
-	if (x+1 != len(a) && y+1 != len(a[0])) && a[x+1][y+1] {
+	if (x+1 != gs.xb && y+1 != gs.yb) && gs.cells[s][x+1][y+1] {
 		t++
 	}
 
 	return t
+}
+
+func (gs *GroupSimulation) Render(surface *sdl.Surface) error {
+	for x := 0; x < gs.xb; x++ {
+		for y := 0; y < gs.yb; y++ {
+			bs := []bool{}
+
+			for s := 0; s < gs.sb; s++ {
+				bs = append(bs, gs.cells[s][x][y])
+			}
+
+			c := gs.color(bs)
+
+			rect := sdl.Rect{
+				int32(x * gs.cellSize),
+				int32(y * gs.cellSize),
+				int32(gs.cellSize),
+				int32(gs.cellSize),
+			}
+			surface.FillRect(&rect, c)
+		}
+	}
+
+	return nil
+}
+
+func (gs *GroupSimulation) color(bs []bool) uint32 {
+	var sb strings.Builder
+
+	for _, b := range bs {
+		if b {
+			sb.WriteString("0")
+		} else {
+			sb.WriteString("1")
+		}
+	}
+
+	i, _ := strconv.ParseInt(sb.String(), 2, 32)
+	ix := uint32(i)
+
+	return ix
 }

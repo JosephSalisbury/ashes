@@ -3,9 +3,6 @@ package main
 import (
 	"log"
 	"math/rand"
-	"strconv"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/veandco/go-sdl2/sdl"
@@ -17,58 +14,14 @@ const (
 	WindowSizeX = 1200
 	WindowSizeY = 800
 
-	CellSize = 10
+	CellSize = 5
+
+	FramesPerSecond = 60
+	StepsPerSecond  = 30
 )
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
-}
-
-func randUint8() uint8 {
-	return uint8(rand.Intn(255))
-}
-
-func randBool() bool {
-	return rand.Float32() < 0.3
-}
-
-func getColor(bs []bool) uint32 {
-	var sb strings.Builder
-
-	for _, b := range bs {
-		if b {
-			sb.WriteString("0")
-		} else {
-			sb.WriteString("1")
-		}
-
-	}
-
-	i, _ := strconv.ParseInt(sb.String(), 2, 32)
-	ix := uint32(i)
-
-	return ix
-}
-
-func Render(simulations []*Simulation, surface *sdl.Surface) error {
-	x := WindowSizeX / CellSize
-	y := WindowSizeY / CellSize
-
-	for i := 0; i < x; i++ {
-		for j := 0; j < y; j++ {
-			cs := []bool{}
-			for _, s := range simulations {
-				cs = append(cs, s.GetCell(i, j))
-			}
-
-			c := getColor(cs)
-
-			rect := sdl.Rect{int32(i * CellSize), int32(j * CellSize), int32(CellSize), int32(CellSize)}
-			surface.FillRect(&rect, c)
-		}
-	}
-
-	return nil
 }
 
 func main() {
@@ -90,15 +43,14 @@ func main() {
 	}
 	defer window.Destroy()
 
-	simulations := []*Simulation{}
-
-	for i := 0; i < 32; i++ {
-		s, err := NewSimulation(CellSize, WindowSizeX, WindowSizeY)
+	var simulation Simulation
+	{
+		s, err := NewGroupSimulation(CellSize, WindowSizeX, WindowSizeY)
 		if err != nil {
-			log.Fatalf("could not create simulation %v: %v", i, err)
+			log.Fatalf("could not create simulation: %v", err)
 		}
 
-		simulations = append(simulations, s)
+		simulation = s
 	}
 
 	running := true
@@ -116,32 +68,13 @@ func main() {
 			log.Fatalf("could not get surface: %v", err)
 		}
 
-		for i := 0; i < len(simulations); i++ {
-			if rand.Float32() < 0.0005 {
-				s, err := NewSimulation(CellSize, WindowSizeX, WindowSizeY)
-				if err != nil {
-					log.Fatalf("could not recreate simulation %v: %v", i, err)
-				}
-
-				simulations[i] = s
-			}
-		}
-
-		var wg sync.WaitGroup
-		for _, s := range simulations {
-			wg.Add(1)
-			go func(s *Simulation) {
-				defer wg.Done()
-				if err := s.Step(); err != nil {
-					log.Fatalf("could not step simulation: %v", err)
-				}
-			}(s)
-		}
-		wg.Wait()
-
 		surface.FillRect(nil, 0)
 
-		if err := Render(simulations, surface); err != nil {
+		if err := simulation.Step(); err != nil {
+			log.Fatalf("could not step simulation: %v", err)
+		}
+
+		if err := simulation.Render(surface); err != nil {
 			log.Fatalf("could not render simulation: %v", err)
 		}
 
